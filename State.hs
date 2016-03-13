@@ -49,8 +49,14 @@ aliveNode m (Alive _ nodeName nodeAddr nodePort) = do
             , stateChange = 1
             }
 
+      -- Add to map
       putStrLn $ "put node:" ++ nodeName
       putMVar nodeMapMVar (Map.insert nodeName ns nodeMap)
+
+      -- Add at the end and swap with the node at the offset
+      let nodesMVar = nodes m
+      nodeList <- takeMVar nodesMVar
+      putMVar nodesMVar (ns:nodeList)
       return True
 
 probeNode :: Node -> StateT Memberlist IO ()
