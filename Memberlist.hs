@@ -18,18 +18,34 @@ schedule memberlist = do
     probe memberlist
   return ()
 
-run = do
-  let config = Config { indirectChecks = 3
-                      , probeInterval = 10
-                      , probeTimeout = 5
-                      , nodeName = "n0"
-                      }
+  gossip memberlist
 
+
+setAlive :: Memberlist -> IO Bool
+setAlive m = do
+  let conf = (config m)
+  let alive = Alive 0 (nodeName conf) (nodeAddr conf) (nodePort conf)
+  
+  aliveNode m alive
+  
+
+create :: Config -> IO Memberlist
+create config = do
   handlerMap <- newMVar Map.empty
-  let memberlist = Memberlist { config = config
-                              , sequenceNum = 0
-                              , ackHandlers = handlerMap
-                              }
+  nodes <- newMVar []
+  nodeMap <- newMVar Map.empty
+  
+  let m = Memberlist
+        { config = config
+        , sequenceNum = 0
+        , ackHandlers = handlerMap
+        , nodes = nodes
+        , nodeMap = nodeMap
+        }
+        
+  setAlive m
+  
+  schedule m
 
   -- testinig msg
   go $ forever $ do
@@ -40,8 +56,17 @@ run = do
         putStrLn "===> send msg"
         f $ AckMessage False
       Nothing -> putStrLn "nothing"
+  
+  return m
+
+
+run = do
+  let config = Config { indirectChecks = 3
+                      , probeInterval = 10
+                      , probeTimeout = 5
+                      , nodeName = "n0"
+                      , nodeAddr = "127.0.0.1"
+                      , nodePort = 8801
+                      }
         
-  schedule memberlist
-  gossip memberlist
-
-
+  create config

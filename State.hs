@@ -11,7 +11,7 @@ import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Control.Exception
-import Control.Monad.State.Lazy;
+import Control.Monad.State.Lazy (StateT, put, get, lift, evalStateT);
 import qualified Data.Map as Map  
 
 setAckChannel :: Int -> Chan AckMessage -> Int -> StateT Memberlist IO ()
@@ -27,6 +27,31 @@ sendMsg node msg = do
 
 suspectNode node = do
   putStrLn $ "suspect " ++ (show node)
+
+aliveNode :: Memberlist -> Message -> IO Bool
+aliveNode m (Alive _ nodeName nodeAddr nodePort) = do
+  let nodeMapMVar = (nodeMap m)
+  nodeMap <- takeMVar nodeMapMVar
+  -- Check if we've never seen this node before, and if not, then
+  -- store this node in our node map.
+  case (Map.lookup nodeName nodeMap) of
+    Just nodeState -> return False
+    Nothing -> do
+      let node = Node
+            { name = nodeName
+            , addr = nodeAddr
+            , port = nodePort
+            }
+      let ns = NodeState
+            { node = node
+            , incarnation = 0
+            , state = StateAlive
+            , stateChange = 1
+            }
+
+      putStrLn $ "put node:" ++ nodeName
+      putMVar nodeMapMVar (Map.insert nodeName ns nodeMap)
+      return True
 
 probeNode :: Node -> StateT Memberlist IO ()
 probeNode node = do
