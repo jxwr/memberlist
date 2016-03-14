@@ -14,12 +14,10 @@ schedule :: Memberlist -> IO ()
 schedule memberlist = do
   -- probe
   go $ forever $ do
-    threadDelay $ 1 * second
+    threadDelay $ 10 * second
     probe memberlist
-  return ()
 
   gossip memberlist
-
 
 setAlive :: Memberlist -> IO Bool
 setAlive m = do
@@ -50,12 +48,17 @@ create config = do
   -- testinig msg
   go $ forever $ do
     threadDelay $ 2 * second
+    putStrLn "\n===== test ====="
     handlers <- takeMVar handlerMap
+    putMVar handlerMap handlers
     case Map.lookup 1 handlers of
       Just f -> do
         putStrLn "===> send msg"
-        f $ AckMessage False
+        f $ AckMessage True
       Nothing -> putStrLn "nothing"
+    nodeList <- takeMVar nodes
+    forM_ nodeList $ \n -> putStrLn $ "<node>:" ++ (name . node) n
+    putMVar nodes nodeList
   
   return m
 
