@@ -8,6 +8,7 @@ import qualified Data.Map as Map
 import Util
 import Struct
 import State
+import Net
 import BuggySelect
 
 schedule :: Memberlist -> IO ()
@@ -18,6 +19,7 @@ schedule memberlist = do
     probe memberlist
 
   gossip memberlist
+
 
 setAlive :: Memberlist -> IO Bool
 setAlive m = do
@@ -42,6 +44,8 @@ create config = do
         }
         
   setAlive m
+
+  go $ udpListen m "8601"
   
   schedule m
 

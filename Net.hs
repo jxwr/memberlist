@@ -1,5 +1,6 @@
 module Net where
 
+import Struct
 import Data.Bits
 import Network.Socket
 import Network.BSD
@@ -14,14 +15,9 @@ encodeAndSendMsg destAddr port msg = do
   n <- sendTo sock (show msg) (addrAddress serverAddr)
   putStrLn $ "sent " ++ show n ++ " bytes: " ++ (show msg)
 
----
 
-type HandlerFunc = Socket -> SockAddr -> String -> IO ()
-
-serveLog :: String              -- ^ Port number or name; 514 is default
-         -> HandlerFunc         -- ^ Function to handle incoming messages
-         -> IO ()
-serveLog port handlerfunc = withSocketsDo $
+udpListen :: Memberlist -> String -> IO ()
+udpListen m port = withSocketsDo $ do
   do addrinfos <- getAddrInfo 
        (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
        Nothing (Just port)
@@ -31,12 +27,14 @@ serveLog port handlerfunc = withSocketsDo $
      procMessages sock
        where procMessages sock =
                do (msg, n, addr) <- recvFrom sock 1024
-                  handlerfunc sock addr msg
+                  handleCommand m sock addr msg
                   procMessages sock
 
--- A simple handler that prints incoming packets
-plainHandler :: HandlerFunc
-plainHandler sock addr msg = do
+
+type HandlerFunc = Memberlist -> Socket -> SockAddr -> String -> IO ()
+
+handleCommand :: HandlerFunc
+handleCommand m sock addr msg = do
     putStrLn $ "From " ++ (show addr) ++ ": " ++ msg
     sendTo sock ("pong:" ++ msg) addr
     return ()
