@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+module SuspectMsg where
+
 import GHC.Generics
 import Data.Aeson
 import Data.Text

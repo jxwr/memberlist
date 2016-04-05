@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+module AckRespMsg where
+
 import GHC.Generics
 import Data.Aeson
 import Data.Text

@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+module DeadMsg where
+
 import GHC.Generics
 import Data.Aeson
 import Data.Text

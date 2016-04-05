@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+module AliveMsg where
+
 import GHC.Generics
 import Data.Aeson
 import Data.Text
@@ -9,7 +11,7 @@ data AliveMsg = AliveMsg {
   addr :: !Text,
   node :: !Text,
   port :: Int,
-  meta :: !Text,
+  meta :: !Text
   } deriving (Show, Generic)
 
 instance FromJSON AliveMsg
