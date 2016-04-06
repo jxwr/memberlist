@@ -50,6 +50,15 @@ encodeAndSendMsg destAddr port msgType msg = do
   sock <- socket (addrFamily serverAddr) Datagram defaultProtocol  
 
   encodeAndSendMsgToAddr sock (addrAddress serverAddr) msgType msg
+
+encodeAndSendMsgOverSock :: ToJSON msg => Socket -> String -> Int -> MsgType -> msg -> IO ()
+encodeAndSendMsgOverSock sock destAddr port msgType msg = do
+  
+  addrinfos <- getAddrInfo Nothing (Just destAddr) (Just (show port))
+  
+  let serverAddr = head addrinfos
+
+  encodeAndSendMsgToAddr sock (addrAddress serverAddr) msgType msg  
   
 encodeAndSendMsgToAddr :: ToJSON msg => Socket -> SockAddr -> MsgType -> msg -> IO ()
 encodeAndSendMsgToAddr sock destAddr msgType msg = do
@@ -126,9 +135,7 @@ handlePing msg (sock, fromAddr) = do
 handleIndirectPing msg (sock, _) = do
   let IndirectPingMsg seqNo target port node = msg
       pingMsg = PingMsg 99 node
-  addrinfos <- getAddrInfo Nothing (Just (unpack target)) (Just (show port))
-  let serverAddr = head addrinfos
-  encodeAndSendMsgToAddr sock (addrAddress serverAddr) pingMsgType pingMsg
+  encodeAndSendMsgOverSock sock (unpack target) port pingMsgType pingMsg
 
 handleAck msg from =
   putStrLn $ "ACK:" ++ (show msg)
