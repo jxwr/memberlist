@@ -7,8 +7,8 @@ import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString (sendTo, recvFrom)
 import Data.List
 import Data.Aeson
-import Data.Text (pack)
-import Data.ByteString.Lazy (unpack, toStrict, cons)
+import Data.Text (unpack, pack, empty)
+import Data.ByteString.Lazy (toStrict, cons)
 import qualified Data.ByteString as BS
 import Control.Concurrent
 
@@ -46,14 +46,20 @@ encodeAndSendMsg destAddr port msgType msg = do
   addrinfos <- getAddrInfo Nothing (Just destAddr) (Just (show port))
   
   let serverAddr = head addrinfos
+
+  sock <- socket (addrFamily serverAddr) Datagram defaultProtocol  
+
+  encodeAndSendMsgToAddr sock (addrAddress serverAddr) msgType msg
   
-  sock <- socket (addrFamily serverAddr) Datagram defaultProtocol
+encodeAndSendMsgToAddr :: ToJSON msg => Socket -> SockAddr -> MsgType -> msg -> IO ()
+encodeAndSendMsgToAddr sock destAddr msgType msg = do
   
   let bytes = toStrict (cons msgType $ encode msg)
   
-  n <- sendTo sock bytes (addrAddress serverAddr)
+  n <- sendTo sock bytes destAddr
   
-  putStrLn $ "sent " ++ show n ++ " bytes: " ++ (show bytes)
+  putStrLn $ "Sent " ++ show n ++ " bytes to " ++
+    show destAddr ++ " => " ++ show bytes
 
 udpListen :: Int -> IO ()
 udpListen port = withSocketsDo $ do
@@ -62,7 +68,6 @@ udpListen port = withSocketsDo $ do
        Nothing (Just (show port))
        
      let serveraddr = head addrinfos
-     putStrLn (show serveraddr)
      
      sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
      
@@ -70,38 +75,66 @@ udpListen port = withSocketsDo $ do
      
      procMessages sock
        where procMessages sock =
-               do (bytes, addr) <- recvFrom sock 1024
+               do putStrLn "========= proc messages ========="
+                  
+                  (bytes, addr) <- recvFrom sock 1024
+                  
                   let msgType = BS.head bytes
                       rawMsg = BS.tail bytes
 
-                  putStrLn $ "DEBUG * type=" ++ show msgType
-
-                  handleCommand msgType rawMsg
+                  putStrLn $ "[DEBUG] * type=" ++ show msgType
+                  
+                  handleCommand msgType rawMsg (sock, addr)
                   
                   procMessages sock
                   
-             handleCommand msgType rawMsg
+             handleCommand msgType rawMsg from
                | msgType == pingMsgType = 
                    case decodeStrict rawMsg :: Maybe PingMsg of
-                     Just ping -> putStrLn (show ping)
-                     Nothing -> putStr "nothing"
+                     Just msg -> handlePing msg from
+                     Nothing -> return ()
+                     
                | msgType == indirectPingMsgType =
                    case decodeStrict rawMsg :: Maybe IndirectPingMsg of
-                     Just ping -> putStrLn (show ping)
-                     Nothing -> putStr "nothing"
+                     Just msg -> handleIndirectPing msg from
+                     Nothing -> return ()
+                     
                | msgType == ackRespMsgType =
                    case decodeStrict rawMsg :: Maybe AckRespMsg of
-                     Just ping -> putStrLn (show ping)
-                     Nothing -> putStr "nothing"
+                     Just msg -> handleAck msg from
+                     Nothing -> return ()
+                     
                | msgType == suspectMsgType =
                    case decodeStrict rawMsg :: Maybe SuspectMsg of
-                     Just ping -> putStrLn (show ping)
-                     Nothing -> putStr "nothing"
+                     Just msg -> handleSuspect msg from
+                     Nothing -> return ()
+                     
                | msgType == aliveMsgType =
                    case decodeStrict rawMsg :: Maybe AliveMsg of
-                     Just ping -> putStrLn (show ping)
-                     Nothing -> putStr "nothing"
+                     Just msg -> handleAlive msg from
+                     Nothing -> return ()
+                     
                | msgType == deadMsgType =
                    case decodeStrict rawMsg :: Maybe DeadMsg of
-                     Just ping -> putStrLn (show ping)
-                     Nothing -> putStr "nothing"
+                     Just msg -> handleDead msg from
+                     Nothing -> return ()
+
+handlePing msg (sock, fromAddr) = do
+  let ackMsg = AckRespMsg (PingMsg.seqNo msg) empty
+  encodeAndSendMsgToAddr sock fromAddr ackRespMsgType ackMsg
+
+handleIndirectPing msg (sock, _) = do
+  let IndirectPingMsg seqNo target port node = msg
+      pingMsg = PingMsg 99 node
+  addrinfos <- getAddrInfo Nothing (Just (unpack target)) (Just (show port))
+  let serverAddr = head addrinfos
+  encodeAndSendMsgToAddr sock (addrAddress serverAddr) pingMsgType pingMsg
+
+handleAck msg from =
+  putStrLn $ "ACK:" ++ (show msg)
+
+handleSuspect msg from = putStrLn (show msg)
+
+handleAlive msg from = putStrLn (show msg)
+
+handleDead msg from = putStrLn (show msg)
